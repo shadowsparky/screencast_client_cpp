@@ -5,7 +5,7 @@
 #-------------------------------------------------
 
 QT       += core gui network
-LIBS += -lavformat -lavcodec -lavutil
+LIBS += -lavformat -lavcodec -lswresample -lswscale -lavutil
 
 
 INCLUDEPATH += /usr/local/include/opencv4
