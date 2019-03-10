@@ -7,8 +7,10 @@
 #include "opencv2/core.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
+
 extern "C" {
     #include <libavcodec/avcodec.h>
+    #include "libswscale/swscale.h"
 }
 using namespace cv;
 
@@ -23,7 +25,7 @@ class MainView : public QMainWindow
 public:
     explicit MainView(QWidget *parent = nullptr);
     void initializeProcess();
-    void decode(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt);
+    int decode_write_frame();
     ~MainView();
 
 public slots:
@@ -36,7 +38,10 @@ private:
     AVCodecParserContext *parser;
     AVCodecContext *c = NULL;
     AVFrame *picture;
+    AVFrame *RGBPicture;
     AVPacket *pkt;
+    int bytes;
+    uint8_t *buffer;
 //    QProcess process;
 //    AVPacket *packet;
 //    AVCodec *m_pCodec;

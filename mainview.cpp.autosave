@@ -102,7 +102,6 @@ void MainView::handlePictureByteArray()
     int ret = 0;
 //    qDebug() << "0";
     auto test = socket->readAll();
-    qDebug() << socket->size();
 //    pkt->data = (uint8_t*) test.data();
 //    pkt->size= test.size();
 //    size_t data_size = 1000;
