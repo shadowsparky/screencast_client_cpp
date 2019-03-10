@@ -23,6 +23,7 @@ class MainView : public QMainWindow
 public:
     explicit MainView(QWidget *parent = nullptr);
     void initializeProcess();
+    void decode(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt);
     ~MainView();
 
 public slots:
@@ -31,11 +32,16 @@ public slots:
 private:
     Ui::MainView *ui;
     QTcpSocket *socket;
-    QProcess process;
-    AVPacket packet;
-    AVCodec *m_pCodec;
-    AVCodecContext *m_pCodecCtx;
-    AVFrame *m_pFrame;
+    AVCodec *codec;
+    AVCodecParserContext *parser;
+    AVCodecContext *c = NULL;
+    AVFrame *picture;
+    AVPacket *pkt;
+//    QProcess process;
+//    AVPacket *packet;
+//    AVCodec *m_pCodec;
+//    AVCodecContext *m_pCodecCtx;
+//    AVFrame *m_pFrame;
 };
 
 #endif // MAINVIEW_H

@@ -9,11 +9,30 @@ MainView::MainView(QWidget *parent) :
 {
     ui->setupUi(this);
     socket = new QTcpSocket(this);
-    m_pCodec = avcodec_find_decoder(AV_CODEC_ID_H264);
-    m_pCodecCtx = avcodec_alloc_context3(m_pCodec);
-    avcodec_open2(m_pCodecCtx, m_pCodec, nullptr);
+    avcodec_register_all();
+    pkt = av_packet_alloc();
+    if (!pkt) {
+        qDebug() << "Error in packet initialization";
+        exit(-1);
+    }
+    codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+    if (!codec) {
+        qDebug() << "codec not found";
+        exit(-2);
+    }
+    parser = av_parser_init(codec->id);
+    if (!parser) {
+        qDebug() << "parser not found";
+        exit(-3);
+    }
+    c = avcodec_alloc_context3(codec);
+    picture = av_frame_alloc();
+    if (avcodec_open2(c, codec, NULL) < 0) {
+        qDebug() << "could not open codec";
+        exit(-4);
+    }
+//    initializeProcess();
     connect(socket, SIGNAL(readyRead()), SLOT(handlePictureByteArray()));
-    //initializeProcess();
     socket->connectToHost("192.168.31.221", 1337);
 
 }
@@ -23,40 +42,58 @@ MainView::~MainView()
     delete ui;
 }
 
+void MainView::decode(AVCodecContext *dec_ctx, AVFrame *frame, AVPacket *pkt)
+{
+    char buf[1024];
+    int ret;
+    ret = avcodec_send_packet(dec_ctx, pkt);
+    if (ret < 0) {
+        fprintf(stderr, "Error sending a packet for decoding\n");
+        exit(1);
+    }
+    while (ret >= 0) {
+        ret = avcodec_receive_frame(dec_ctx, frame);
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+            return;
+        else if (ret < 0) {
+            fprintf(stderr, "Error during decoding\n");
+            exit(1);
+        }
+
+        Mat mat1(c->height, c->width, CV_8UC1, picture->data[0], (unsigned long) picture->linesize[0]);
+        imshow("frame", mat1);
+
+//        printf("saving frame %3d\n", dec_ctx->frame_number);
+//        fflush(stdout);
+        /* the picture is allocated by the decoder. no need to
+           free it */
+//        snprintf(buf, sizeof(buf), filename, dec_ctx->frame_number);
+    }
+}
+
+
+
 void MainView::handlePictureByteArray()
 {
+    int ret = 0;
     QByteArray data = socket->readAll();
-    m_pFrame = av_frame_alloc();
-    unsigned char *dataf = (unsigned char*) data.data();
-    AVPacket emptyPacket;
-    av_init_packet(&emptyPacket);
-    emptyPacket.data = dataf;
-//    m_pCodecCtx->width = 720;
-//    m_pCodecCtx->height = 1280;
-    emptyPacket.size = data.size();
-    int test = avcodec_send_packet(m_pCodecCtx, &emptyPacket);
-    int test2 = avcodec_receive_frame(m_pCodecCtx, m_pFrame);
-
-    if (test == 0 && test2 == 0) {
-        qDebug() << "okey?";
-        Mat mat(m_pCodecCtx->height, m_pCodecCtx->width, CV_8UC1,  m_pFrame->data[0]);
-        Mat exmat(m_pCodecCtx->height, m_pCodecCtx->width, CV_8UC1,  m_pFrame->extended_data[0]);
-        imshow("mat", mat);
-        imshow("exmat", exmat);
-
-        //Mat changed;
-//        cvtColor(mat, mat, COLOR_BGR2RGB);
-        //auto test = QImage(mat.data, mat.cols, mat.rows, mat.step, QImage::Format_RGB888);
-        //ui->image->setPixmap(QPixmap::fromImage(test));
-
-        //imshow("changed", changed);
-    } else {
-        qDebug() << "not okey?";
+    uint8_t *dataf = (uint8_t*) data.data();
+    size_t data_size = data.size();
+    if (data.size() > 0) {
+        ret = av_parser_parse2(parser, c, &pkt->data, &pkt->size, dataf, data_size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
+        if (ret < 0) {
+            qDebug() << "Error while parsing";
+            return;
+        }
+        data += ret;
+        data_size -= ret;
+        if (pkt->size) {
+            decode(c, picture, pkt);
+        }
     }
-    //process.write(data);
 }
 
 void MainView::initializeProcess()
 {
-    process.start("ffplay", QStringList() << "-framerate" << "60" << "-");
+//    process.start("ffplay", QStringList() << "-framerate" << "60" << "-");
 }
